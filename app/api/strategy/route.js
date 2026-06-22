@@ -31,7 +31,7 @@ Respond in this exact JSON format only, no other text:
 Percentages must add to 100. Be specific and data-driven for ${market}.`;
 
   const message = await client.messages.create({
-    model: 'claude-sonnet-4-6',
+    model: 'claude-haiku-4-5-20251001',
     max_tokens: 1024,
     messages: [{ role: 'user', content: prompt }]
   });
