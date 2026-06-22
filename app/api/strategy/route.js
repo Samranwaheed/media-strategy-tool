@@ -25,8 +25,11 @@ Respond in this exact JSON format only, no markdown, no extra text:
       }]
     });
 
-    const text = message.content[0].text;
-    const parsed = JSON.parse(text.trim());
+    let text = message.content[0].text.trim();
+const start = text.indexOf('{');
+const end = text.lastIndexOf('}');
+text = text.slice(start, end + 1);
+const parsed = JSON.parse(text);
     return Response.json(parsed);
 
   } catch (error) {
