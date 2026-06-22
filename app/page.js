@@ -26,25 +26,11 @@ export default function Home() {
         body: JSON.stringify({ budget, market, industry, age, gender, objective, brief })
       });
       const text = await res.text();
-const start = text.indexOf('{');
-const end = text.lastIndexOf('}');
-const data = JSON.parse(text.slice(start, end + 1));
-if (data.error) {
-  let clean = data.error;
-  const start = clean.indexOf('{');
-  const end = clean.lastIndexOf('}');
-  if (start !== -1 && end !== -1) {
-    try {
-      setResult(JSON.parse(clean.slice(start, end + 1)));
-    } catch {
-      setResult({ error: clean });
-    }
-  } else {
-    setResult({ error: clean });
-  }
-} else {
-  setResult(data);
-}
+      const start = text.indexOf('{');
+      const end = text.lastIndexOf('}');
+      if (start === -1 || end === -1) throw new Error('Invalid response');
+      const data = JSON.parse(text.slice(start, end + 1));
+      setResult(data);
     } catch(e) {
       setResult({ error: 'Something went wrong. Please try again.' });
     }
@@ -111,7 +97,7 @@ if (data.error) {
             <h3 style={{ margin: '0 0 16px', fontSize: 14, fontWeight: 600, color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Campaign Objective</h3>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               {objectives.map(o => (
-                <button key={o} onClick={() => setObjective(o)} style={{ padding: '8px 16px', borderRadius: 20, border: `1px solid ${objective === o ? '#6c63ff' : '#ddd'}`, background: objective === o ? '#6c63ff' : 'white', color: objective === o ? 'white' : '#444', fontSize: 13, cursor: 'pointer', fontWeight: objective === o ? 600 : 400 }}>{o}</button>
+                <button key={o} onClick={() => setObjective(o)} style={{ padding: '8px 16px', borderRadius: 20, border: `1px solid ${objective === o ? '#6c63ff' : '#ddd'}`, background: objective === o ? '#6c63ff' : 'white', color: objective === o ? 'white' : '#444', fontSize: 13, cursor: 'pointer' }}>{o}</button>
               ))}
             </div>
           </div>
