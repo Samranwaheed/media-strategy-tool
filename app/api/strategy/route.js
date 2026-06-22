@@ -10,26 +10,21 @@ export async function POST(request) {
     const message = await client.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 1024,
-      messages: [{
-        role: 'user',
-        content: `You are a senior media strategist. Generate a media strategy for:
-BUDGET: $${budget}
-MARKET: ${market}
-INDUSTRY: ${industry}
-AUDIENCE: ${age}, ${gender}
-OBJECTIVE: ${objective}
-BRIEF: ${brief || 'No brief provided'}
-
-Respond in this exact JSON format only, no markdown, no extra text:
-{"title":"Campaign name","summary":"2 sentence summary","allocations":[{"platform":"Platform","percentage":30,"rationale":"Why"}],"strategy":"3-4 paragraph strategy","insights":[{"label":"Label","text":"Detail"}],"kpis":["KPI1","KPI2","KPI3"]}`
-      }]
+      messages: [
+        {
+          role: 'user',
+          content: `You are a senior media strategist. Generate a media strategy. Budget: $${budget}, Market: ${market}, Industry: ${industry}, Audience: ${age} ${gender}, Objective: ${objective}, Brief: ${brief || 'none'}. Return ONLY raw JSON, no markdown, no backticks, starting with { and ending with }.`
+        },
+        {
+          role: 'assistant',
+          content: '{'
+        }
+      ]
     });
 
-    let text = message.content[0].text.trim();
-const start = text.indexOf('{');
-const end = text.lastIndexOf('}');
-text = text.slice(start, end + 1);
-const parsed = JSON.parse(text);
+    const text = '{' + message.content[0].text;
+    const end = text.lastIndexOf('}');
+    const parsed = JSON.parse(text.slice(0, end + 1));
     return Response.json(parsed);
 
   } catch (error) {
