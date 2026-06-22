@@ -25,7 +25,10 @@ export default function Home() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ budget, market, industry, age, gender, objective, brief })
       });
-      const data = await res.json();
+      const text = await res.text();
+const start = text.indexOf('{');
+const end = text.lastIndexOf('}');
+const data = JSON.parse(text.slice(start, end + 1));
 if (data.error) {
   let clean = data.error;
   const start = clean.indexOf('{');
