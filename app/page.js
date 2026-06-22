@@ -26,7 +26,22 @@ export default function Home() {
         body: JSON.stringify({ budget, market, industry, age, gender, objective, brief })
       });
       const data = await res.json();
-      setResult(data);
+if (data.error) {
+  let clean = data.error;
+  const start = clean.indexOf('{');
+  const end = clean.lastIndexOf('}');
+  if (start !== -1 && end !== -1) {
+    try {
+      setResult(JSON.parse(clean.slice(start, end + 1)));
+    } catch {
+      setResult({ error: clean });
+    }
+  } else {
+    setResult({ error: clean });
+  }
+} else {
+  setResult(data);
+}
     } catch(e) {
       setResult({ error: 'Something went wrong. Please try again.' });
     }
