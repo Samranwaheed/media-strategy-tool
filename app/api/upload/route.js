@@ -1,5 +1,3 @@
-import Anthropic from '@anthropic-ai/sdk';
-
 export async function POST(request) {
   try {
     const formData = await request.formData();
@@ -9,15 +7,31 @@ export async function POST(request) {
       return Response.json({ error: 'No file provided' }, { status: 400 });
     }
 
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    const bytes = await file.arrayBuffer();
+    const buffer = Buffer.from(bytes);
 
-    const uploadedFile = await client.beta.files.upload(
-      { file: file },
-      { headers: { 'anthropic-beta': 'files-api-2025-04-14' } }
-    );
+    const response = await fetch('https://api.anthropic.com/v1/files', {
+      method: 'POST',
+      headers: {
+        'x-api-key': process.env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'anthropic-beta': 'files-api-2025-04-14',
+      },
+      body: (() => {
+        const fd = new FormData();
+        fd.append('file', new Blob([buffer], { type: file.type || 'application/pdf' }), file.name);
+        return fd;
+      })(),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      return Response.json({ error: result.error?.message || 'Upload failed' }, { status: 500 });
+    }
 
     return Response.json({
-      fileId: uploadedFile.id,
+      fileId: result.id,
       fileName: file.name,
       success: true,
     });
