@@ -1,119 +1,186 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
 export default function Home() {
-  const [budget, setBudget] = useState(50000);
-  const [market, setMarket] = useState('United Arab Emirates');
-  const [industry, setIndustry] = useState('Retail & E-commerce');
-  const [age, setAge] = useState('25-44');
-  const [gender, setGender] = useState('All genders');
-  const [objective, setObjective] = useState('Brand awareness');
-  const [brief, setBrief] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    budget: 50000,
+    market: 'United Arab Emirates',
+    industry: 'Retail & E-commerce',
+    age: '25-44',
+    gender: 'All genders',
+    objective: 'Sales & conversions',
+    brief: '',
+  });
   const [result, setResult] = useState(null);
-  const [fileIds, setFileIds] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const objectives = ['Brand awareness','Lead generation','Sales & conversions','App installs','Engagement','Retargeting'];
-  const markets = ['United Arab Emirates','Saudi Arabia','GCC (All markets)','United Kingdom','United States','Global'];
-  const industries = ['Retail & E-commerce','Real Estate','Finance & Banking','FMCG','Automotive','Travel & Hospitality','Technology','Healthcare','Luxury','Education'];
+  const objectives = ['Brand awareness', 'Lead generation', 'Sales & conversions', 'App installs', 'Engagement', 'Retargeting'];
 
-  useEffect(() => {
-    const saved = localStorage.getItem('uploadedFiles');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      setFileIds(parsed.map(f => f.id));
-    }
-  }, []);
-
-  async function generate() {
+  const handleSubmit = async () => {
     setLoading(true);
+    setError('');
     setResult(null);
     try {
       const res = await fetch('/api/strategy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ budget, market, industry, age, gender, objective, brief, fileIds })
+        body: JSON.stringify(formData),
       });
-      const text = await res.text();
-      const start = text.indexOf('{');
-      const end = text.lastIndexOf('}');
-      if (start === -1 || end === -1) throw new Error('Invalid response');
-      const data = JSON.parse(text.slice(start, end + 1));
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Something went wrong');
       setResult(data);
-    } catch(e) {
-      setResult({ error: 'Something went wrong. Please try again.' });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  }
+  };
 
   return (
-    <main style={{ minHeight: '100vh', background: '#f8f9fa', fontFamily: 'Inter, sans-serif' }}>
-      <div style={{ background: '#1a1a2e', padding: '16px 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ width: 32, height: 32, background: '#6c63ff', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 700, fontSize: 14 }}>M</div>
-          <span style={{ color: 'white', fontWeight: 600, fontSize: 16 }}>MediaStrategyAI</span>
-          <span style={{ background: '#6c63ff22', color: '#a89cff', fontSize: 11, padding: '2px 8px', borderRadius: 20, border: '1px solid #6c63ff44' }}>BETA</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          {fileIds.length > 0 && (
-            <span style={{ color: '#a89cff', fontSize: 13 }}>📄 {fileIds.length} document{fileIds.length > 1 ? 's' : ''} loaded</span>
-          )}
-          <a href="/admin" style={{ color: '#a89cff', fontSize: 13, textDecoration: 'none' }}>Admin ↗</a>
-        </div>
+    <main style={{ minHeight: '100vh', background: '#f4f4f8', fontFamily: 'system-ui, sans-serif', paddingBottom: '60px' }}>
+      <div style={{ background: '#fff', borderBottom: '1px solid #e0e0e0', padding: '20px 40px' }}>
+        <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700 }}>Media Strategy Generator</h1>
+        <p style={{ margin: '4px 0 0', color: '#666', fontSize: '0.95rem' }}>Enter your campaign details and get an AI-generated media strategy with budget allocation</p>
       </div>
 
-      <div style={{ maxWidth: 900, margin: '0 auto', padding: '40px 24px' }}>
-        <div style={{ marginBottom: 32 }}>
-          <h1 style={{ fontSize: 28, fontWeight: 700, color: '#1a1a2e', margin: 0 }}>Media Strategy Generator</h1>
-          <p style={{ color: '#666', marginTop: 8, fontSize: 15 }}>Enter your campaign details and get an AI-generated media strategy with budget allocation</p>
+      <div style={{ maxWidth: '800px', margin: '32px auto', padding: '0 20px' }}>
+
+        <div style={{ background: '#fff', borderRadius: '12px', padding: '28px', marginBottom: '20px', border: '1px solid #e0e0e0' }}>
+          <div style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.1em', color: '#888', marginBottom: '16px' }}>BUDGET</div>
+          <input
+            type="range" min="1000" max="1000000" step="1000"
+            value={formData.budget}
+            onChange={(e) => setFormData({ ...formData, budget: Number(e.target.value) })}
+            style={{ width: '100%', marginBottom: '8px' }}
+          />
+          <div style={{ textAlign: 'right', fontWeight: 700, fontSize: '1.4rem' }}>${formData.budget.toLocaleString()}</div>
         </div>
 
-        <div style={{ display: 'grid', gap: 16 }}>
-          <div style={{ background: 'white', borderRadius: 12, padding: 24, border: '1px solid #eee' }}>
-            <h3 style={{ margin: '0 0 16px', fontSize: 14, fontWeight: 600, color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Budget</h3>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-              <input type="range" min="5000" max="500000" step="5000" value={budget} onChange={e => setBudget(Number(e.target.value))} style={{ flex: 1 }} />
-              <span style={{ fontSize: 24, fontWeight: 700, color: '#1a1a2e', minWidth: 120 }}>${budget.toLocaleString()}</span>
+        <div style={{ background: '#fff', borderRadius: '12px', padding: '28px', marginBottom: '20px', border: '1px solid #e0e0e0' }}>
+          <div style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.1em', color: '#888', marginBottom: '16px' }}>MARKET & AUDIENCE</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.85rem', color: '#555', marginBottom: '6px' }}>Market</label>
+              <select value={formData.market} onChange={(e) => setFormData({ ...formData, market: e.target.value })}
+                style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd', fontSize: '0.95rem' }}>
+                {['United Arab Emirates','Saudi Arabia','Egypt','Kuwait','Qatar','Bahrain','Oman','Jordan','Lebanon','Global'].map(m => <option key={m}>{m}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.85rem', color: '#555', marginBottom: '6px' }}>Industry</label>
+              <select value={formData.industry} onChange={(e) => setFormData({ ...formData, industry: e.target.value })}
+                style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd', fontSize: '0.95rem' }}>
+                {['Retail & E-commerce','Finance & Banking','Healthcare','Real Estate','Food & Beverage','Automotive','Education','Travel & Tourism','Technology','Fashion & Beauty'].map(i => <option key={i}>{i}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.85rem', color: '#555', marginBottom: '6px' }}>Age Group</label>
+              <select value={formData.age} onChange={(e) => setFormData({ ...formData, age: e.target.value })}
+                style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd', fontSize: '0.95rem' }}>
+                {['18-24','25-34','25-44','35-54','45-64','55+','All ages'].map(a => <option key={a}>{a}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.85rem', color: '#555', marginBottom: '6px' }}>Gender</label>
+              <select value={formData.gender} onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
+                style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ddd', fontSize: '0.95rem' }}>
+                {['All genders','Male skew','Female skew'].map(g => <option key={g}>{g}</option>)}
+              </select>
             </div>
           </div>
+        </div>
 
-          <div style={{ background: 'white', borderRadius: 12, padding: 24, border: '1px solid #eee' }}>
-            <h3 style={{ margin: '0 0 16px', fontSize: 14, fontWeight: 600, color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Market & Audience</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <div>
-                <label style={{ fontSize: 13, color: '#666', display: 'block', marginBottom: 6 }}>Market</label>
-                <select value={market} onChange={e => setMarket(e.target.value)} style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 14 }}>
-                  {markets.map(m => <option key={m}>{m}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={{ fontSize: 13, color: '#666', display: 'block', marginBottom: 6 }}>Industry</label>
-                <select value={industry} onChange={e => setIndustry(e.target.value)} style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 14 }}>
-                  {industries.map(i => <option key={i}>{i}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={{ fontSize: 13, color: '#666', display: 'block', marginBottom: 6 }}>Age Group</label>
-                <select value={age} onChange={e => setAge(e.target.value)} style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 14 }}>
-                  {['18-24','25-34','25-44','35-54','45+','All ages'].map(a => <option key={a}>{a}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={{ fontSize: 13, color: '#666', display: 'block', marginBottom: 6 }}>Gender</label>
-                <select value={gender} onChange={e => setGender(e.target.value)} style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #ddd', fontSize: 14 }}>
-                  {['All genders','Male skew','Female skew'].map(g => <option key={g}>{g}</option>)}
-                </select>
-              </div>
-            </div>
+        <div style={{ background: '#fff', borderRadius: '12px', padding: '28px', marginBottom: '20px', border: '1px solid #e0e0e0' }}>
+          <div style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.1em', color: '#888', marginBottom: '16px' }}>CAMPAIGN OBJECTIVE</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+            {objectives.map(obj => (
+              <button key={obj} onClick={() => setFormData({ ...formData, objective: obj })}
+                style={{ padding: '8px 18px', borderRadius: '20px', border: '1px solid', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 500,
+                  borderColor: formData.objective === obj ? '#6c2bd9' : '#ddd',
+                  background: formData.objective === obj ? '#6c2bd9' : '#fff',
+                  color: formData.objective === obj ? '#fff' : '#333' }}>
+                {obj}
+              </button>
+            ))}
           </div>
+        </div>
 
-          <div style={{ background: 'white', borderRadius: 12, padding: 24, border: '1px solid #eee' }}>
-            <h3 style={{ margin: '0 0 16px', fontSize: 14, fontWeight: 600, color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Campaign Objective</h3>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {objectives.map(o => (
-                <button key={o} onClick={() => setObjective(o)} style={{ padding: '8px 16px', borderRadius: 20, border: `1px solid ${objective === o ? '#6c63ff' : '#ddd'}`, background: objective === o ? '#6c63ff' : 'white', color: objective === o ? 'white' : '#444', fontSize: 13, cursor: 'pointer' }}>{o}</button>
+        <div style={{ background: '#fff', borderRadius: '12px', padding: '28px', marginBottom: '20px', border: '1px solid #e0e0e0' }}>
+          <div style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.1em', color: '#888', marginBottom: '16px' }}>CAMPAIGN BRIEF</div>
+          <textarea
+            placeholder="Describe your product, target audience, key message, or any specific requirements..."
+            value={formData.brief}
+            onChange={(e) => setFormData({ ...formData, brief: e.target.value })}
+            rows={4}
+            style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #ddd', fontSize: '0.95rem', resize: 'vertical', boxSizing: 'border-box' }}
+          />
+        </div>
+
+        <button onClick={handleSubmit} disabled={loading}
+          style={{ width: '100%', padding: '18px', borderRadius: '10px', border: 'none', background: '#6c2bd9', color: '#fff', fontSize: '1.1rem', fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1 }}>
+          {loading ? 'Generating...' : 'Generate Media Strategy'}
+        </button>
+
+        {error && (
+          <div style={{ marginTop: '16px', padding: '14px', background: '#fff0f0', border: '1px solid #fcc', borderRadius: '8px', color: '#c00' }}>
+            {error}
+          </div>
+        )}
+
+        {result && (
+          <div style={{ marginTop: '32px' }}>
+            <div style={{ background: '#fff', borderRadius: '12px', padding: '28px', marginBottom: '20px', border: '1px solid #e0e0e0' }}>
+              <h2 style={{ margin: '0 0 8px', fontSize: '1.4rem' }}>{result.title}</h2>
+              <p style={{ margin: 0, color: '#555', lineHeight: 1.7 }}>{result.summary}</p>
+            </div>
+
+            <div style={{ background: '#fff', borderRadius: '12px', padding: '28px', marginBottom: '20px', border: '1px solid #e0e0e0' }}>
+              <div style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.1em', color: '#888', marginBottom: '20px' }}>BUDGET ALLOCATION</div>
+              {result.allocations && result.allocations.map((a) => (
+                <div key={a.platform} style={{ marginBottom: '16px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                    <span style={{ fontWeight: 600 }}>{a.platform}</span>
+                    <span style={{ color: '#6c2bd9', fontWeight: 700 }}>{a.percentage}% — ${Math.round(formData.budget * a.percentage / 100).toLocaleString()}</span>
+                  </div>
+                  <div style={{ background: '#f0f0f0', borderRadius: '4px', height: '8px' }}>
+                    <div style={{ background: '#6c2bd9', width: `${a.percentage}%`, height: '8px', borderRadius: '4px' }} />
+                  </div>
+                  <div style={{ fontSize: '0.85rem', color: '#666', marginTop: '4px' }}>{a.rationale}</div>
+                </div>
               ))}
             </div>
-          </div>
 
-          <div style={{ background: 'white',
+            <div style={{ background: '#fff', borderRadius: '12px', padding: '28px', marginBottom: '20px', border: '1px solid #e0e0e0' }}>
+              <div style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.1em', color: '#888', marginBottom: '12px' }}>STRATEGY</div>
+              <p style={{ margin: 0, lineHeight: 1.8, color: '#333' }}>{result.strategy}</p>
+            </div>
+
+            {result.insights && (
+              <div style={{ background: '#fff', borderRadius: '12px', padding: '28px', marginBottom: '20px', border: '1px solid #e0e0e0' }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.1em', color: '#888', marginBottom: '16px' }}>INSIGHTS</div>
+                {result.insights.map((ins) => (
+                  <div key={ins.label} style={{ marginBottom: '12px', paddingLeft: '12px', borderLeft: '3px solid #6c2bd9' }}>
+                    <div style={{ fontWeight: 600, marginBottom: '2px' }}>{ins.label}</div>
+                    <div style={{ color: '#555', fontSize: '0.9rem' }}>{ins.text}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {result.kpis && (
+              <div style={{ background: '#fff', borderRadius: '12px', padding: '28px', border: '1px solid #e0e0e0' }}>
+                <div style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.1em', color: '#888', marginBottom: '16px' }}>KPIs</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                  {result.kpis.map((kpi) => (
+                    <span key={kpi} style={{ padding: '6px 14px', background: '#f0ebff', color: '#6c2bd9', borderRadius: '20px', fontSize: '0.9rem', fontWeight: 500 }}>{kpi}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </main>
+  );
+}
