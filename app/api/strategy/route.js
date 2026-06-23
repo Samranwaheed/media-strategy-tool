@@ -7,7 +7,6 @@ export async function POST(request) {
 
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-    // Build message content - start with the strategy request
     const userContent = [];
 
     // Add uploaded documents if any
@@ -24,11 +23,10 @@ export async function POST(request) {
       });
     }
 
-    // Add the main strategy prompt
+    // Add the main strategy prompt — NOTE: must be "text" not "content"
     userContent.push({
       type: 'text',
-      content: `You are a senior media strategist. Create a detailed media strategy.
-
+      text: `You are a senior media strategist. Create a detailed media strategy.
 Budget: $${budget}
 Market: ${market}
 Industry: ${industry}
@@ -56,18 +54,29 @@ Respond with ONLY this JSON structure, no other text:
 }`
     });
 
-    const message = await client.beta.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 2048,
-      messages: [{ role: 'user', content: userContent }],
-      betas: ['files-api-2025-04-14']
-    });
+    // Use beta only when files are present, otherwise use standard API
+    let message;
+    if (fileIds && fileIds.length > 0) {
+      message = await client.beta.messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 2048,
+        messages: [{ role: 'user', content: userContent }],
+        betas: ['files-api-2025-04-14']
+      });
+    } else {
+      message = await client.messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 2048,
+        messages: [{ role: 'user', content: userContent }]
+      });
+    }
 
     const text = message.content[0].text;
     const clean = text.replace(/```json|```/g, '').trim();
     const start = clean.indexOf('{');
     const end = clean.lastIndexOf('}');
     const parsed = JSON.parse(clean.slice(start, end + 1));
+
     return Response.json(parsed);
 
   } catch (error) {
