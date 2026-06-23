@@ -3,15 +3,31 @@ import Anthropic from '@anthropic-ai/sdk';
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { budget, market, industry, age, gender, objective, brief } = body;
+    const { budget, market, industry, age, gender, objective, brief, fileIds } = body;
+
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-    const message = await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 2048,
-      messages: [
-        {
-          role: 'user',
-          content: `You are a senior media strategist. Create a detailed media strategy.
+
+    // Build message content - start with the strategy request
+    const userContent = [];
+
+    // Add uploaded documents if any
+    if (fileIds && fileIds.length > 0) {
+      for (const fileId of fileIds) {
+        userContent.push({
+          type: 'document',
+          source: { type: 'file', file_id: fileId }
+        });
+      }
+      userContent.push({
+        type: 'text',
+        text: `The documents above contain our agency's past campaign data and benchmarks. Use them to inform your strategy.`
+      });
+    }
+
+    // Add the main strategy prompt
+    userContent.push({
+      type: 'text',
+      content: `You are a senior media strategist. Create a detailed media strategy.
 
 Budget: $${budget}
 Market: ${market}
@@ -38,8 +54,13 @@ Respond with ONLY this JSON structure, no other text:
   ],
   "kpis": ["KPI 1", "KPI 2", "KPI 3", "KPI 4"]
 }`
-        }
-      ]
+    });
+
+    const message = await client.beta.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 2048,
+      messages: [{ role: 'user', content: userContent }],
+      betas: ['files-api-2025-04-14']
     });
 
     const text = message.content[0].text;
