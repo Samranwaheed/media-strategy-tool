@@ -4,7 +4,7 @@ export async function POST(request) {
   try {
     const formData = await request.formData();
     const file = formData.get('file');
-    
+
     if (!file) {
       return Response.json({ error: 'No file provided' }, { status: 400 });
     }
@@ -16,10 +16,10 @@ export async function POST(request) {
       { headers: { 'anthropic-beta': 'files-api-2025-04-14' } }
     );
 
-    return Response.json({ 
+    return Response.json({
       fileId: uploadedFile.id,
       fileName: file.name,
-      success: true 
+      success: true,
     });
 
   } catch (error) {
