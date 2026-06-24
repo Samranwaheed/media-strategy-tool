@@ -9,12 +9,12 @@ export async function POST(request) {
       for (const fileId of fileIds) {
         userContent.push({ type: 'document', source: { type: 'file', file_id: fileId } });
       }
-      userContent.push({ type: 'text', text: 'The documents above may contain CPM benchmarks or past campaign data. Extract any CPM values mentioned and use them for reach calculations.' });
+      userContent.push({ type: 'text', text: 'The documents above may contain CPM benchmarks. Extract any CPM values and use them for reach calculations.' });
     }
 
     userContent.push({
       type: 'text',
-      text: `You are a senior media strategist. Create a detailed media strategy for this campaign.
+      text: `You are a senior media strategist. Create a detailed media strategy.
 Budget: $${budget}
 Market: ${market}
 Industry: ${industry}
@@ -23,9 +23,8 @@ Primary Objective: ${primaryObjective}
 Secondary Objective: ${secondaryObjective || 'None'}
 Brief: ${brief || 'General campaign'}
 
-Use realistic CPM benchmarks for the ${market} market. Include OOH and Radio if the budget supports it.
-Sort platforms by highest estimated reach first.
-Keep rationale fields brief (max 10 words each).
+Use realistic CPM benchmarks for ${market}. Include OOH and Radio if budget supports it.
+Keep rationale under 10 words each.
 
 Respond with ONLY this JSON, no other text:
 {
@@ -85,25 +84,6 @@ Respond with ONLY this JSON, no other text:
     });
 
     parsed.allocations.sort((a, b) => b.estimatedReach - a.estimatedReach);
-
-    const decayFactor = 0.55;
-    const targetPopulation = 10000000;
-    let ceilingPopulation = 0;
-    let floorReach = 0;
-
-    parsed.reachCurve = parsed.allocations.map((a, i) => {
-      const platformReachRate = Math.min(a.estimatedReach / targetPopulation, 0.99);
-      ceilingPopulation = 1 - (1 - ceilingPopulation) * (1 - platformReachRate);
-      const ceiling = Math.round(ceilingPopulation * targetPopulation);
-      const incrementalDecayed = i === 0 ? a.estimatedReach : Math.round(a.estimatedReach * Math.pow(decayFactor, i));
-      floorReach = Math.min(floorReach + incrementalDecayed, ceiling);
-      return {
-        platform: parsed.allocations.slice(0, i + 1).map(p => p.platform).join('+'),
-        added: a.platform,
-        ceiling,
-        floor: floorReach,
-      };
-    });
 
     return Response.json(parsed);
 
