@@ -61,6 +61,85 @@ export default function Home() {
     }
   };
 
+  const exportPPT = async () => {
+    const PptxGenJS = (await import('https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js')).default;
+    const prs = new PptxGenJS();
+
+    const titleStyle = { fontSize: 24, bold: true, color: '363636' };
+    const labelStyle = { fontSize: 11, bold: true, color: '888888' };
+    const bodyStyle = { fontSize: 13, color: '333333' };
+
+    // Slide 1 - Title
+    const s1 = prs.addSlide();
+    s1.addText(result.title, { x: 0.5, y: 1.5, w: 9, h: 1, ...titleStyle, fontSize: 28 });
+    s1.addText(result.summary, { x: 0.5, y: 2.8, w: 9, h: 2, ...bodyStyle, fontSize: 14 });
+    s1.addText('Market: ' + formData.market + '   |   Industry: ' + formData.industry + '   |   Budget: $' + formData.budget.toLocaleString(), { x: 0.5, y: 5, w: 9, h: 0.5, fontSize: 11, color: '888888' });
+
+    // Slide 2 - Budget Allocation Table
+    const s2 = prs.addSlide();
+    s2.addText('BUDGET ALLOCATION', { x: 0.5, y: 0.3, w: 9, h: 0.5, ...labelStyle });
+    const tableRows = [
+      [
+        { text: 'Platform', options: { bold: true, fill: 'f0ebff', color: '6c2bd9' } },
+        { text: 'Budget', options: { bold: true, fill: 'f0ebff', color: '6c2bd9' } },
+        { text: 'Est. Reach', options: { bold: true, fill: 'f0ebff', color: '6c2bd9' } },
+        { text: 'Key KPI', options: { bold: true, fill: 'f0ebff', color: '6c2bd9' } },
+        { text: 'Rationale', options: { bold: true, fill: 'f0ebff', color: '6c2bd9' } },
+      ],
+      ...result.allocations.map(a => [
+        { text: a.platform },
+        { text: '$' + (a.budget || Math.round(formData.budget * a.percentage / 100)).toLocaleString() },
+        { text: a.estimatedReach ? (a.estimatedReach / 1000).toFixed(0) + 'K' : '-' },
+        { text: a.mainKPI || '-' },
+        { text: a.rationale },
+      ]),
+    ];
+    s2.addTable(tableRows, { x: 0.5, y: 1, w: 9, fontSize: 11, border: { type: 'solid', color: 'e0e0e0' } });
+
+    // Slide 3 - Reach Curve as table
+    if (result.reachCurve) {
+      const s3 = prs.addSlide();
+      s3.addText('REACH BUILD-UP', { x: 0.5, y: 0.3, w: 9, h: 0.5, ...labelStyle });
+      const reachRows = [
+        [
+          { text: 'Month', options: { bold: true, fill: 'f0ebff', color: '6c2bd9' } },
+          { text: 'Estimated Reach', options: { bold: true, fill: 'f0ebff', color: '6c2bd9' } },
+        ],
+        ...result.reachCurve.map(r => [
+          { text: r.month },
+          { text: (r.reach / 1000).toFixed(0) + 'K' },
+        ]),
+      ];
+      s3.addTable(reachRows, { x: 0.5, y: 1, w: 5, fontSize: 12, border: { type: 'solid', color: 'e0e0e0' } });
+    }
+
+    // Slide 4 - Strategy
+    const s4 = prs.addSlide();
+    s4.addText('STRATEGY', { x: 0.5, y: 0.3, w: 9, h: 0.5, ...labelStyle });
+    s4.addText(result.strategy, { x: 0.5, y: 1, w: 9, h: 4, ...bodyStyle, fontSize: 12 });
+
+    // Slide 5 - Insights
+    if (result.insights) {
+      const s5 = prs.addSlide();
+      s5.addText('INSIGHTS', { x: 0.5, y: 0.3, w: 9, h: 0.5, ...labelStyle });
+      result.insights.forEach((ins, i) => {
+        s5.addText(ins.label, { x: 0.5, y: 1 + i * 1.2, w: 9, h: 0.4, fontSize: 13, bold: true, color: '6c2bd9' });
+        s5.addText(ins.text, { x: 0.5, y: 1.4 + i * 1.2, w: 9, h: 0.6, fontSize: 12, color: '555555' });
+      });
+    }
+
+    // Slide 6 - KPIs
+    if (result.kpis) {
+      const s6 = prs.addSlide();
+      s6.addText('KPIs', { x: 0.5, y: 0.3, w: 9, h: 0.5, ...labelStyle });
+      result.kpis.forEach((kpi, i) => {
+        s6.addText('• ' + kpi, { x: 0.5, y: 1 + i * 0.6, w: 9, h: 0.5, fontSize: 13, color: '333333' });
+      });
+    }
+
+    prs.writeFile({ fileName: result.title + '.pptx' });
+  };
+
   const PieChart = ({ allocations, budget }) => {
     const size = 220;
     const cx = 110, cy = 110, r = 80;
@@ -76,7 +155,7 @@ export default function Home() {
       const y2 = cy + r * Math.sin(endAngle);
       const large = pct > 0.5 ? 1 : 0;
       return {
-        path: `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z`,
+        path: 'M ' + cx + ' ' + cy + ' L ' + x1 + ' ' + y1 + ' A ' + r + ' ' + r + ' 0 ' + large + ' 1 ' + x2 + ' ' + y2 + ' Z',
         color: COLORS[i % COLORS.length],
         label: a.platform,
         pct: a.percentage,
@@ -237,6 +316,13 @@ export default function Home() {
 
         {result && (
           <div style={{ marginTop: '32px' }}>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700 }}>Strategy Output</h2>
+              <button onClick={exportPPT} style={{ padding: '10px 24px', borderRadius: '8px', border: '1px solid #6c2bd9', background: '#fff', color: '#6c2bd9', fontSize: '0.95rem', fontWeight: 600, cursor: 'pointer' }}>
+                Export PPT
+              </button>
+            </div>
 
             <div style={{ background: '#fff', borderRadius: '12px', padding: '28px', marginBottom: '20px', border: '1px solid #e0e0e0' }}>
               <h2 style={{ margin: '0 0 8px', fontSize: '1.4rem' }}>{result.title}</h2>
