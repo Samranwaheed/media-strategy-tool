@@ -34,10 +34,8 @@ Respond with ONLY this JSON, no other text:
     {
       "platform": "Meta",
       "percentage": 35,
-      "budget": 0,
       "cpm": 5.5,
       "frequency": 3,
-      "estimatedReach": 500000,
       "mainKPI": "ROAS 3x",
       "rationale": "reason"
     }
@@ -80,37 +78,39 @@ Respond with ONLY this JSON, no other text:
     // Calculate budget and reach for each platform
     parsed.allocations = parsed.allocations.map(a => {
       const platformBudget = Math.round(budget * a.percentage / 100);
-      const reach = Math.round((platformBudget / a.cpm) * 1000 / a.frequency);
-      return { ...a, budget: platformBudget, estimatedReach: reach };
+      const cpm = parseFloat(a.cpm) || 5;
+      const frequency = parseFloat(a.frequency) || 3;
+      const reach = Math.round((platformBudget / cpm) * 1000 / frequency);
+      return { ...a, budget: platformBudget, cpm, frequency, estimatedReach: reach };
     });
 
     // Sort by highest reach first
     parsed.allocations.sort((a, b) => b.estimatedReach - a.estimatedReach);
 
-    // Calculate cumulative reach curve using independence model (ceiling) and exponential decay (floor)
+    // Calculate cumulative reach curve
     const decayFactor = 0.55;
+    const targetPopulation = 10000000;
     let ceilingPopulation = 0;
     let floorReach = 0;
-    const targetPopulation = 10000000; // assume 10M addressable audience
 
     parsed.reachCurve = parsed.allocations.map((a, i) => {
-      const platformReachRate = a.estimatedReach / targetPopulation;
+      const platformReachRate = Math.min(a.estimatedReach / targetPopulation, 0.99);
 
       // Ceiling: independence model
       ceilingPopulation = 1 - (1 - ceilingPopulation) * (1 - platformReachRate);
       const ceiling = Math.round(ceilingPopulation * targetPopulation);
 
-      // Floor: exponential decay on incremental
+      // Floor: exponential decay
       const incrementalDecayed = i === 0
         ? a.estimatedReach
         : Math.round(a.estimatedReach * Math.pow(decayFactor, i));
       floorReach = Math.min(floorReach + incrementalDecayed, ceiling);
 
       return {
-        platform: i === 0 ? a.platform : parsed.allocations.slice(0, i + 1).map(p => p.platform).join('+'),
+        platform: parsed.allocations.slice(0, i + 1).map(p => p.platform).join('+'),
+        added: a.platform,
         ceiling,
         floor: floorReach,
-        added: a.platform,
       };
     });
 
