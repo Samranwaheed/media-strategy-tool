@@ -1,6 +1,29 @@
 'use client';
 import { useState } from 'react';
 
+function calcReachCurve(allocations) {
+  const TARGET = 10000000;
+  const DECAY = 0.55;
+  let ceilPop = 0;
+  let floorReach = 0;
+  return allocations.map((a, i) => {
+    const reach = Number(a.estimatedReach) || 0;
+    const rate = Math.min(reach / TARGET, 0.99);
+    ceilPop = 1 - (1 - ceilPop) * (1 - rate);
+    const ceiling = Math.round(ceilPop * TARGET);
+    const inc = i === 0 ? reach : Math.round(reach * Math.pow(DECAY, i));
+    floorReach = Math.min(floorReach + inc, ceiling);
+    return { added: a.platform, ceiling, floor: floorReach };
+  });
+}
+
+function fmtN(n) {
+  const v = Number(n);
+  if (!v || isNaN(v)) return '-';
+  if (v >= 1000000) return (v / 1000000).toFixed(1) + 'M';
+  return (v / 1000).toFixed(0) + 'K';
+}
+
 export default function Home() {
   const [formData, setFormData] = useState({
     budget: 50000,
@@ -13,6 +36,7 @@ export default function Home() {
     brief: '',
   });
   const [result, setResult] = useState(null);
+  const [reachCurve, setReachCurve] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [uploadedFiles, setUploadedFiles] = useState([]);
@@ -45,6 +69,7 @@ export default function Home() {
     setLoading(true);
     setError('');
     setResult(null);
+    setReachCurve([]);
     try {
       const res = await fetch('/api/strategy', {
         method: 'POST',
@@ -54,6 +79,8 @@ export default function Home() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Something went wrong');
       setResult(data);
+      const curve = calcReachCurve(data.allocations);
+      setReachCurve(curve);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -75,33 +102,18 @@ export default function Home() {
     a.click();
   };
 
-  const fmtReach = (n) => {
-    const num = Number(n);
-    if (!num || isNaN(num)) return '-';
-    if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
-    return (num / 1000).toFixed(0) + 'K';
-  };
-
   const PieChart = ({ allocations, budget }) => {
     const size = 220;
     const cx = 110, cy = 110, r = 80;
-    let cumulative = 0;
+    let cum = 0;
     const slices = allocations.map((a, i) => {
       const pct = a.percentage / 100;
-      const startAngle = cumulative * 2 * Math.PI - Math.PI / 2;
-      cumulative += pct;
-      const endAngle = cumulative * 2 * Math.PI - Math.PI / 2;
-      const x1 = cx + r * Math.cos(startAngle);
-      const y1 = cy + r * Math.sin(startAngle);
-      const x2 = cx + r * Math.cos(endAngle);
-      const y2 = cy + r * Math.sin(endAngle);
-      const large = pct > 0.5 ? 1 : 0;
-      return {
-        path: 'M ' + cx + ' ' + cy + ' L ' + x1 + ' ' + y1 + ' A ' + r + ' ' + r + ' 0 ' + large + ' 1 ' + x2 + ' ' + y2 + ' Z',
-        color: COLORS[i % COLORS.length],
-        label: a.platform,
-        pct: a.percentage,
-      };
+      const s = cum * 2 * Math.PI - Math.PI / 2;
+      cum += pct;
+      const e = cum * 2 * Math.PI - Math.PI / 2;
+      const x1 = cx + r * Math.cos(s), y1 = cy + r * Math.sin(s);
+      const x2 = cx + r * Math.cos(e), y2 = cy + r * Math.sin(e);
+      return { path: 'M ' + cx + ' ' + cy + ' L ' + x1 + ' ' + y1 + ' A ' + r + ' ' + r + ' 0 ' + (pct > 0.5 ? 1 : 0) + ' 1 ' + x2 + ' ' + y2 + ' Z', color: COLORS[i % COLORS.length], label: a.platform, pct: a.percentage };
     });
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: '32px', flexWrap: 'wrap' }}>
@@ -121,13 +133,14 @@ export default function Home() {
     );
   };
 
-  const ReachBuildUp = ({ data }) => {
+  const ReachTable = ({ data }) => {
     if (!data || data.length === 0) return null;
+    const maxC = Math.max(...data.map(d => d.ceiling));
     return (
       <div>
-        <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', fontSize: '0.8rem' }}>
-          <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ display: 'inline-block', width: '12px', height: '3px', background: '#6c2bd9' }} />Ceiling (Independence Model)</span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ display: 'inline-block', width: '12px', height: '3px', background: '#a855f7' }} />Floor (Exponential Decay)</span>
+        <div style={{ display: 'flex', gap: '20px', marginBottom: '16px', fontSize: '0.82rem' }}>
+          <span><span style={{ display: 'inline-block', width: '12px', height: '3px', background: '#6c2bd9', marginRight: '6px', verticalAlign: 'middle' }} />Ceiling (Independence Model)</span>
+          <span><span style={{ display: 'inline-block', width: '12px', height: '3px', background: '#a855f7', marginRight: '6px', verticalAlign: 'middle' }} />Floor (Exponential Decay)</span>
         </div>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
           <thead>
@@ -135,30 +148,25 @@ export default function Home() {
               <th style={{ padding: '10px 12px', textAlign: 'left', color: '#888', fontWeight: 600, fontSize: '0.8rem' }}>Platform Added</th>
               <th style={{ padding: '10px 12px', textAlign: 'left', color: '#6c2bd9', fontWeight: 600, fontSize: '0.8rem' }}>Ceiling Reach</th>
               <th style={{ padding: '10px 12px', textAlign: 'left', color: '#a855f7', fontWeight: 600, fontSize: '0.8rem' }}>Floor Reach</th>
-              <th style={{ padding: '10px 12px', textAlign: 'left', color: '#888', fontWeight: 600, fontSize: '0.8rem' }}>Range</th>
+              <th style={{ padding: '10px 12px', textAlign: 'left', color: '#888', fontWeight: 600, fontSize: '0.8rem' }}>Progress</th>
             </tr>
           </thead>
           <tbody>
-            {data.map((d, i) => {
-              const ceiling = Number(d.ceiling);
-              const floor = Number(d.floor);
-              const pct = data[data.length - 1] ? Math.round(ceiling / Number(data[data.length - 1].ceiling) * 100) : 0;
-              return (
-                <tr key={i} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                  <td style={{ padding: '12px', fontWeight: 600 }}>
-                    <span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '2px', background: COLORS[i % COLORS.length], marginRight: '8px' }} />
-                    {d.added}
-                  </td>
-                  <td style={{ padding: '12px', color: '#6c2bd9', fontWeight: 700 }}>{fmtReach(ceiling)}</td>
-                  <td style={{ padding: '12px', color: '#a855f7', fontWeight: 700 }}>{fmtReach(floor)}</td>
-                  <td style={{ padding: '12px' }}>
-                    <div style={{ background: '#f0f0f0', borderRadius: '4px', height: '8px', width: '120px' }}>
-                      <div style={{ background: 'linear-gradient(90deg, #6c2bd9, #a855f7)', width: pct + '%', height: '8px', borderRadius: '4px' }} />
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
+            {data.map((d, i) => (
+              <tr key={i} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                <td style={{ padding: '12px', fontWeight: 600 }}>
+                  <span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '2px', background: COLORS[i % COLORS.length], marginRight: '8px' }} />
+                  {d.added}
+                </td>
+                <td style={{ padding: '12px', color: '#6c2bd9', fontWeight: 700 }}>{fmtN(d.ceiling)}</td>
+                <td style={{ padding: '12px', color: '#a855f7', fontWeight: 700 }}>{fmtN(d.floor)}</td>
+                <td style={{ padding: '12px' }}>
+                  <div style={{ background: '#f0f0f0', borderRadius: '4px', height: '8px', width: '120px' }}>
+                    <div style={{ background: 'linear-gradient(90deg,#6c2bd9,#a855f7)', width: Math.round(d.ceiling / maxC * 100) + '%', height: '8px', borderRadius: '4px' }} />
+                  </div>
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
@@ -172,11 +180,13 @@ export default function Home() {
         <p style={{ margin: '4px 0 0', color: '#666', fontSize: '0.95rem' }}>Enter your campaign details and get an AI-generated media strategy with budget allocation</p>
       </div>
       <div style={{ maxWidth: '800px', margin: '32px auto', padding: '0 20px' }}>
+
         <div style={{ background: '#fff', borderRadius: '12px', padding: '28px', marginBottom: '20px', border: '1px solid #e0e0e0' }}>
           <div style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.1em', color: '#888', marginBottom: '16px' }}>BUDGET</div>
           <input type="range" min="1000" max="1000000" step="1000" value={formData.budget} onChange={(e) => setFormData({ ...formData, budget: Number(e.target.value) })} style={{ width: '100%', marginBottom: '8px' }} />
           <div style={{ textAlign: 'right', fontWeight: 700, fontSize: '1.4rem' }}>${formData.budget.toLocaleString()}</div>
         </div>
+
         <div style={{ background: '#fff', borderRadius: '12px', padding: '28px', marginBottom: '20px', border: '1px solid #e0e0e0' }}>
           <div style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.1em', color: '#888', marginBottom: '16px' }}>MARKET & AUDIENCE</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
@@ -206,6 +216,7 @@ export default function Home() {
             </div>
           </div>
         </div>
+
         <div style={{ background: '#fff', borderRadius: '12px', padding: '28px', marginBottom: '20px', border: '1px solid #e0e0e0' }}>
           <div style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.1em', color: '#888', marginBottom: '16px' }}>CAMPAIGN OBJECTIVES</div>
           <div style={{ marginBottom: '20px' }}>
@@ -225,13 +236,15 @@ export default function Home() {
             </div>
           </div>
         </div>
+
         <div style={{ background: '#fff', borderRadius: '12px', padding: '28px', marginBottom: '20px', border: '1px solid #e0e0e0' }}>
           <div style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.1em', color: '#888', marginBottom: '16px' }}>CAMPAIGN BRIEF</div>
           <textarea placeholder="Describe your product, target audience, key message, or any specific requirements..." value={formData.brief} onChange={(e) => setFormData({ ...formData, brief: e.target.value })} rows={4} style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #ddd', fontSize: '0.95rem', resize: 'vertical', boxSizing: 'border-box' }} />
         </div>
+
         <div style={{ background: '#fff', borderRadius: '12px', padding: '28px', marginBottom: '20px', border: '1px solid #e0e0e0' }}>
           <div style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.1em', color: '#888', marginBottom: '8px' }}>REFERENCE DOCUMENTS (OPTIONAL)</div>
-          <p style={{ margin: '0 0 16px', fontSize: '0.85rem', color: '#666' }}>Upload past campaign reports or briefs (PDF or TXT only). CPM data in documents will be used for reach calculations.</p>
+          <p style={{ margin: '0 0 16px', fontSize: '0.85rem', color: '#666' }}>Upload past campaign reports or briefs (PDF or TXT only).</p>
           <label style={{ display: 'inline-block', padding: '10px 20px', background: '#f0ebff', color: '#6c2bd9', borderRadius: '8px', cursor: uploading ? 'not-allowed' : 'pointer', fontWeight: 600, fontSize: '0.9rem', border: '1px dashed #6c2bd9' }}>
             {uploading ? 'Uploading...' : '+ Upload Document'}
             <input type="file" accept=".pdf,.txt" onChange={handleFileUpload} disabled={uploading} style={{ display: 'none' }} />
@@ -247,24 +260,30 @@ export default function Home() {
             </div>
           )}
         </div>
+
         <button onClick={handleSubmit} disabled={loading} style={{ width: '100%', padding: '18px', borderRadius: '10px', border: 'none', background: '#6c2bd9', color: '#fff', fontSize: '1.1rem', fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1 }}>
           {loading ? 'Generating...' : 'Generate Media Strategy'}
         </button>
+
         {error && <div style={{ marginTop: '16px', padding: '14px', background: '#fff0f0', border: '1px solid #fcc', borderRadius: '8px', color: '#c00' }}>{error}</div>}
+
         {result && (
           <div style={{ marginTop: '32px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700 }}>Strategy Output</h2>
               <button onClick={exportPPT} style={{ padding: '10px 24px', borderRadius: '8px', border: '1px solid #6c2bd9', background: '#fff', color: '#6c2bd9', fontSize: '0.95rem', fontWeight: 600, cursor: 'pointer' }}>Export PPT</button>
             </div>
+
             <div style={{ background: '#fff', borderRadius: '12px', padding: '28px', marginBottom: '20px', border: '1px solid #e0e0e0' }}>
               <h2 style={{ margin: '0 0 8px', fontSize: '1.4rem' }}>{result.title}</h2>
               <p style={{ margin: 0, color: '#555', lineHeight: 1.7 }}>{result.summary}</p>
             </div>
+
             <div style={{ background: '#fff', borderRadius: '12px', padding: '28px', marginBottom: '20px', border: '1px solid #e0e0e0' }}>
               <div style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.1em', color: '#888', marginBottom: '24px' }}>BUDGET ALLOCATION</div>
               {result.allocations && <PieChart allocations={result.allocations} budget={formData.budget} />}
             </div>
+
             <div style={{ background: '#fff', borderRadius: '12px', padding: '28px', marginBottom: '20px', border: '1px solid #e0e0e0', overflowX: 'auto' }}>
               <div style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.1em', color: '#888', marginBottom: '16px' }}>PLATFORM BREAKDOWN</div>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
@@ -280,7 +299,7 @@ export default function Home() {
                       <td style={{ padding: '12px', color: '#6c2bd9', fontWeight: 600 }}>${(a.budget || Math.round(formData.budget * a.percentage / 100)).toLocaleString()}</td>
                       <td style={{ padding: '12px' }}>${a.cpm}</td>
                       <td style={{ padding: '12px' }}>{a.frequency}x</td>
-                      <td style={{ padding: '12px' }}>{fmtReach(a.estimatedReach)}</td>
+                      <td style={{ padding: '12px' }}>{fmtN(a.estimatedReach)}</td>
                       <td style={{ padding: '12px' }}>{a.mainKPI || '-'}</td>
                       <td style={{ padding: '12px', color: '#666', fontSize: '0.85rem' }}>{a.rationale}</td>
                     </tr>
@@ -288,17 +307,20 @@ export default function Home() {
                 </tbody>
               </table>
             </div>
-            {result.reachCurve && (
+
+            {reachCurve.length > 0 && (
               <div style={{ background: '#fff', borderRadius: '12px', padding: '28px', marginBottom: '20px', border: '1px solid #e0e0e0' }}>
                 <div style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.1em', color: '#888', marginBottom: '4px' }}>CUMULATIVE REACH BUILD-UP</div>
-                <p style={{ margin: '0 0 20px', fontSize: '0.8rem', color: '#aaa' }}>Shows range between independence model ceiling and exponential decay floor as each platform is added</p>
-                <ReachBuildUp data={result.reachCurve} />
+                <p style={{ margin: '0 0 20px', fontSize: '0.8rem', color: '#aaa' }}>Range between independence model ceiling and exponential decay floor as each platform is added</p>
+                <ReachTable data={reachCurve} />
               </div>
             )}
+
             <div style={{ background: '#fff', borderRadius: '12px', padding: '28px', marginBottom: '20px', border: '1px solid #e0e0e0' }}>
               <div style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.1em', color: '#888', marginBottom: '12px' }}>STRATEGY</div>
               <p style={{ margin: 0, lineHeight: 1.8, color: '#333' }}>{result.strategy}</p>
             </div>
+
             {result.insights && (
               <div style={{ background: '#fff', borderRadius: '12px', padding: '28px', marginBottom: '20px', border: '1px solid #e0e0e0' }}>
                 <div style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.1em', color: '#888', marginBottom: '16px' }}>INSIGHTS</div>
@@ -310,6 +332,7 @@ export default function Home() {
                 ))}
               </div>
             )}
+
             {result.kpis && (
               <div style={{ background: '#fff', borderRadius: '12px', padding: '28px', border: '1px solid #e0e0e0' }}>
                 <div style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.1em', color: '#888', marginBottom: '16px' }}>KPIs</div>
