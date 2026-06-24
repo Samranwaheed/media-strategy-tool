@@ -25,6 +25,7 @@ Brief: ${brief || 'General campaign'}
 
 Use realistic CPM benchmarks for the ${market} market. Include OOH and Radio if the budget supports it.
 Sort platforms by highest estimated reach first.
+Keep rationale fields brief (max 10 words each).
 
 Respond with ONLY this JSON, no other text:
 {
@@ -37,7 +38,7 @@ Respond with ONLY this JSON, no other text:
       "cpm": 5.5,
       "frequency": 3,
       "mainKPI": "ROAS 3x",
-      "rationale": "reason"
+      "rationale": "brief reason"
     }
   ],
   "strategy": "detailed strategy paragraph",
@@ -65,7 +66,7 @@ Respond with ONLY this JSON, no other text:
       headers,
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 2048,
+        max_tokens: 4096,
         messages: [{ role: 'user', content: userContent }],
       }),
     });
@@ -75,7 +76,6 @@ Respond with ONLY this JSON, no other text:
     const clean = text.replace(/```json|```/g, '').trim();
     const parsed = JSON.parse(clean.slice(clean.indexOf('{'), clean.lastIndexOf('}') + 1));
 
-    // Calculate budget and reach for each platform
     parsed.allocations = parsed.allocations.map(a => {
       const platformBudget = Math.round(budget * a.percentage / 100);
       const cpm = parseFloat(a.cpm) || 5;
@@ -84,10 +84,8 @@ Respond with ONLY this JSON, no other text:
       return { ...a, budget: platformBudget, cpm, frequency, estimatedReach: reach };
     });
 
-    // Sort by highest reach first
     parsed.allocations.sort((a, b) => b.estimatedReach - a.estimatedReach);
 
-    // Calculate cumulative reach curve
     const decayFactor = 0.55;
     const targetPopulation = 10000000;
     let ceilingPopulation = 0;
@@ -95,17 +93,10 @@ Respond with ONLY this JSON, no other text:
 
     parsed.reachCurve = parsed.allocations.map((a, i) => {
       const platformReachRate = Math.min(a.estimatedReach / targetPopulation, 0.99);
-
-      // Ceiling: independence model
       ceilingPopulation = 1 - (1 - ceilingPopulation) * (1 - platformReachRate);
       const ceiling = Math.round(ceilingPopulation * targetPopulation);
-
-      // Floor: exponential decay
-      const incrementalDecayed = i === 0
-        ? a.estimatedReach
-        : Math.round(a.estimatedReach * Math.pow(decayFactor, i));
+      const incrementalDecayed = i === 0 ? a.estimatedReach : Math.round(a.estimatedReach * Math.pow(decayFactor, i));
       floorReach = Math.min(floorReach + incrementalDecayed, ceiling);
-
       return {
         platform: parsed.allocations.slice(0, i + 1).map(p => p.platform).join('+'),
         added: a.platform,
