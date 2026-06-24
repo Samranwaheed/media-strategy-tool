@@ -116,68 +116,58 @@ export default function Home() {
 
   const ReachBuildUp = ({ data }) => {
     if (!data || data.length === 0) return null;
-    const validData = data.filter(d => d.ceiling > 0 && d.floor >= 0 && !isNaN(d.ceiling) && !isNaN(d.floor));
-    if (validData.length === 0) return <div style={{ color: '#999', fontSize: '0.9rem' }}>Reach data unavailable</div>;
-
+    const validData = data.filter(d => Number(d.ceiling) > 0 && !isNaN(Number(d.ceiling)));
+    if (validData.length === 0) return <div style={{ color: '#999' }}>Reach data unavailable</div>;
     const w = 600, h = 300, padL = 70, padR = 20, padT = 30, padB = 70;
-    const maxVal = Math.max(...validData.map(d => d.ceiling), 1);
-
-    const getX = (i) => padL + (i / Math.max(validData.length - 1, 1)) * (w - padL - padR);
-    const getYC = (d) => padT + (1 - d.ceiling / maxVal) * (h - padT - padB);
-    const getYF = (d) => padT + (1 - d.floor / maxVal) * (h - padT - padB);
-
-    const points = validData.map((d, i) => ({ x: getX(i), yC: getYC(d), yF: getYF(d), ...d }));
-
-    const ceilingPath = points.map((p, i) => (i === 0 ? 'M' : 'L') + ' ' + p.x.toFixed(1) + ' ' + p.yC.toFixed(1)).join(' ');
-    const floorPath = points.map((p, i) => (i === 0 ? 'M' : 'L') + ' ' + p.x.toFixed(1) + ' ' + p.yF.toFixed(1)).join(' ');
-    const bandPath = ceilingPath + ' ' + [...points].reverse().map(p => 'L ' + p.x.toFixed(1) + ' ' + p.yF.toFixed(1)).join(' ') + ' Z';
-
-    const fmt = (n) => {
-      if (!n || isNaN(n)) return '0';
-      return n >= 1000000 ? (n / 1000000).toFixed(1) + 'M' : (n / 1000).toFixed(0) + 'K';
-    };
-
+    const maxVal = Math.max(...validData.map(d => Number(d.ceiling)));
+    if (!maxVal || maxVal === 0) return <div style={{ color: '#999' }}>Reach data unavailable</div>;
+    const pts = validData.map((d, i) => {
+      const x = padL + (validData.length === 1 ? (w - padL - padR) / 2 : (i / (validData.length - 1)) * (w - padL - padR));
+      const ceiling = Number(d.ceiling);
+      const floor = Number(d.floor);
+      const yC = padT + (1 - ceiling / maxVal) * (h - padT - padB);
+      const yF = padT + (1 - floor / maxVal) * (h - padT - padB);
+      return { x, yC, yF, ceiling, floor, added: d.added };
+    });
+    const fmt = (n) => n >= 1000000 ? (n / 1000000).toFixed(1) + 'M' : (n / 1000).toFixed(0) + 'K';
+    const cPath = pts.map((p, i) => (i === 0 ? 'M' : 'L') + ' ' + p.x.toFixed(1) + ' ' + p.yC.toFixed(1)).join(' ');
+    const fPath = pts.map((p, i) => (i === 0 ? 'M' : 'L') + ' ' + p.x.toFixed(1) + ' ' + p.yF.toFixed(1)).join(' ');
+    const band = cPath + ' ' + [...pts].reverse().map(p => 'L ' + p.x.toFixed(1) + ' ' + p.yF.toFixed(1)).join(' ') + ' Z';
     return (
       <div style={{ overflowX: 'auto' }}>
         <svg width="100%" viewBox={'0 0 ' + w + ' ' + h} style={{ overflow: 'visible', minWidth: '400px' }}>
           <defs>
             <linearGradient id="bandGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#888888" stopOpacity="0.25" />
-              <stop offset="100%" stopColor="#888888" stopOpacity="0.05" />
+              <stop offset="0%" stopColor="#888" stopOpacity="0.25" />
+              <stop offset="100%" stopColor="#888" stopOpacity="0.05" />
             </linearGradient>
           </defs>
-
           <line x1={padL} y1={padT} x2={padL} y2={h - padB} stroke="#ddd" strokeWidth="1" />
           <line x1={padL} y1={h - padB} x2={w - padR} y2={h - padB} stroke="#ddd" strokeWidth="1" />
-
           {[0, 0.25, 0.5, 0.75, 1].map((t, i) => {
             const y = padT + t * (h - padT - padB);
-            const val = Math.round(maxVal * (1 - t));
             return (
               <g key={i}>
                 <line x1={padL} y1={y} x2={w - padR} y2={y} stroke="#f0f0f0" strokeWidth="1" />
-                <text x={padL - 6} y={y + 4} textAnchor="end" fontSize="10" fill="#999">{fmt(val)}</text>
+                <text x={padL - 6} y={y + 4} textAnchor="end" fontSize="10" fill="#999">{fmt(Math.round(maxVal * (1 - t)))}</text>
               </g>
             );
           })}
-
-          <path d={bandPath} fill="url(#bandGrad)" />
-          <path d={ceilingPath} fill="none" stroke="#6c2bd9" strokeWidth="2.5" strokeDasharray="6,3" />
-          <path d={floorPath} fill="none" stroke="#a855f7" strokeWidth="2.5" strokeDasharray="6,3" />
-
-          {points.map((p, i) => (
+          <path d={band} fill="url(#bandGrad)" />
+          <path d={cPath} fill="none" stroke="#6c2bd9" strokeWidth="2.5" strokeDasharray="6,3" />
+          <path d={fPath} fill="none" stroke="#a855f7" strokeWidth="2.5" strokeDasharray="6,3" />
+          {pts.map((p, i) => (
             <g key={i}>
               <circle cx={p.x} cy={p.yC} r="5" fill="#6c2bd9" stroke="#fff" strokeWidth="2" />
               <circle cx={p.x} cy={p.yF} r="5" fill="#a855f7" stroke="#fff" strokeWidth="2" />
               <text x={p.x} y={p.yC - 12} textAnchor="middle" fontSize="10" fill="#6c2bd9" fontWeight="600">{fmt(p.ceiling)}</text>
-              <text x={p.x} y={h - padB + 16} textAnchor="middle" fontSize="10" fill="#555" fontWeight="600">{p.added}</text>
+              <text x={p.x} y={h - padB + 16} textAnchor="middle" fontSize="10" fill="#555">{p.added}</text>
             </g>
           ))}
-
           <rect x={padL + 8} y={padT} width="10" height="3" fill="#6c2bd9" />
-          <text x={padL + 22} y={padT + 4} fontSize="10" fill="#6c2bd9">Ceiling (Independence Model)</text>
+          <text x={padL + 22} y={padT + 4} fontSize="10" fill="#6c2bd9">Ceiling (Independence)</text>
           <rect x={padL + 8} y={padT + 14} width="10" height="3" fill="#a855f7" />
-          <text x={padL + 22} y={padT + 18} fontSize="10" fill="#a855f7">Floor (Exponential Decay)</text>
+          <text x={padL + 22} y={padT + 18} fontSize="10" fill="#a855f7">Floor (Decay)</text>
         </svg>
       </div>
     );
@@ -189,15 +179,12 @@ export default function Home() {
         <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700 }}>Media Strategy Generator</h1>
         <p style={{ margin: '4px 0 0', color: '#666', fontSize: '0.95rem' }}>Enter your campaign details and get an AI-generated media strategy with budget allocation</p>
       </div>
-
       <div style={{ maxWidth: '800px', margin: '32px auto', padding: '0 20px' }}>
-
         <div style={{ background: '#fff', borderRadius: '12px', padding: '28px', marginBottom: '20px', border: '1px solid #e0e0e0' }}>
           <div style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.1em', color: '#888', marginBottom: '16px' }}>BUDGET</div>
           <input type="range" min="1000" max="1000000" step="1000" value={formData.budget} onChange={(e) => setFormData({ ...formData, budget: Number(e.target.value) })} style={{ width: '100%', marginBottom: '8px' }} />
           <div style={{ textAlign: 'right', fontWeight: 700, fontSize: '1.4rem' }}>${formData.budget.toLocaleString()}</div>
         </div>
-
         <div style={{ background: '#fff', borderRadius: '12px', padding: '28px', marginBottom: '20px', border: '1px solid #e0e0e0' }}>
           <div style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.1em', color: '#888', marginBottom: '16px' }}>MARKET & AUDIENCE</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
@@ -227,7 +214,6 @@ export default function Home() {
             </div>
           </div>
         </div>
-
         <div style={{ background: '#fff', borderRadius: '12px', padding: '28px', marginBottom: '20px', border: '1px solid #e0e0e0' }}>
           <div style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.1em', color: '#888', marginBottom: '16px' }}>CAMPAIGN OBJECTIVES</div>
           <div style={{ marginBottom: '20px' }}>
@@ -247,12 +233,10 @@ export default function Home() {
             </div>
           </div>
         </div>
-
         <div style={{ background: '#fff', borderRadius: '12px', padding: '28px', marginBottom: '20px', border: '1px solid #e0e0e0' }}>
           <div style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.1em', color: '#888', marginBottom: '16px' }}>CAMPAIGN BRIEF</div>
           <textarea placeholder="Describe your product, target audience, key message, or any specific requirements..." value={formData.brief} onChange={(e) => setFormData({ ...formData, brief: e.target.value })} rows={4} style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #ddd', fontSize: '0.95rem', resize: 'vertical', boxSizing: 'border-box' }} />
         </div>
-
         <div style={{ background: '#fff', borderRadius: '12px', padding: '28px', marginBottom: '20px', border: '1px solid #e0e0e0' }}>
           <div style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.1em', color: '#888', marginBottom: '8px' }}>REFERENCE DOCUMENTS (OPTIONAL)</div>
           <p style={{ margin: '0 0 16px', fontSize: '0.85rem', color: '#666' }}>Upload past campaign reports or briefs (PDF or TXT only). CPM data in documents will be used for reach calculations.</p>
@@ -271,31 +255,24 @@ export default function Home() {
             </div>
           )}
         </div>
-
         <button onClick={handleSubmit} disabled={loading} style={{ width: '100%', padding: '18px', borderRadius: '10px', border: 'none', background: '#6c2bd9', color: '#fff', fontSize: '1.1rem', fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1 }}>
           {loading ? 'Generating...' : 'Generate Media Strategy'}
         </button>
-
         {error && <div style={{ marginTop: '16px', padding: '14px', background: '#fff0f0', border: '1px solid #fcc', borderRadius: '8px', color: '#c00' }}>{error}</div>}
-
         {result && (
           <div style={{ marginTop: '32px' }}>
-
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700 }}>Strategy Output</h2>
               <button onClick={exportPPT} style={{ padding: '10px 24px', borderRadius: '8px', border: '1px solid #6c2bd9', background: '#fff', color: '#6c2bd9', fontSize: '0.95rem', fontWeight: 600, cursor: 'pointer' }}>Export PPT</button>
             </div>
-
             <div style={{ background: '#fff', borderRadius: '12px', padding: '28px', marginBottom: '20px', border: '1px solid #e0e0e0' }}>
               <h2 style={{ margin: '0 0 8px', fontSize: '1.4rem' }}>{result.title}</h2>
               <p style={{ margin: 0, color: '#555', lineHeight: 1.7 }}>{result.summary}</p>
             </div>
-
             <div style={{ background: '#fff', borderRadius: '12px', padding: '28px', marginBottom: '20px', border: '1px solid #e0e0e0' }}>
               <div style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.1em', color: '#888', marginBottom: '24px' }}>BUDGET ALLOCATION</div>
               {result.allocations && <PieChart allocations={result.allocations} budget={formData.budget} />}
             </div>
-
             <div style={{ background: '#fff', borderRadius: '12px', padding: '28px', marginBottom: '20px', border: '1px solid #e0e0e0', overflowX: 'auto' }}>
               <div style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.1em', color: '#888', marginBottom: '16px' }}>PLATFORM BREAKDOWN</div>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
@@ -319,7 +296,6 @@ export default function Home() {
                 </tbody>
               </table>
             </div>
-
             {result.reachCurve && (
               <div style={{ background: '#fff', borderRadius: '12px', padding: '28px', marginBottom: '20px', border: '1px solid #e0e0e0' }}>
                 <div style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.1em', color: '#888', marginBottom: '4px' }}>CUMULATIVE REACH BUILD-UP</div>
@@ -327,12 +303,10 @@ export default function Home() {
                 <ReachBuildUp data={result.reachCurve} />
               </div>
             )}
-
             <div style={{ background: '#fff', borderRadius: '12px', padding: '28px', marginBottom: '20px', border: '1px solid #e0e0e0' }}>
               <div style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.1em', color: '#888', marginBottom: '12px' }}>STRATEGY</div>
               <p style={{ margin: 0, lineHeight: 1.8, color: '#333' }}>{result.strategy}</p>
             </div>
-
             {result.insights && (
               <div style={{ background: '#fff', borderRadius: '12px', padding: '28px', marginBottom: '20px', border: '1px solid #e0e0e0' }}>
                 <div style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.1em', color: '#888', marginBottom: '16px' }}>INSIGHTS</div>
@@ -344,7 +318,6 @@ export default function Home() {
                 ))}
               </div>
             )}
-
             {result.kpis && (
               <div style={{ background: '#fff', borderRadius: '12px', padding: '28px', border: '1px solid #e0e0e0' }}>
                 <div style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.1em', color: '#888', marginBottom: '16px' }}>KPIs</div>
@@ -353,7 +326,6 @@ export default function Home() {
                 </div>
               </div>
             )}
-
           </div>
         )}
       </div>
