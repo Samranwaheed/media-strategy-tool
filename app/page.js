@@ -75,6 +75,13 @@ export default function Home() {
     a.click();
   };
 
+  const fmtReach = (n) => {
+    const num = Number(n);
+    if (!num || isNaN(num)) return '-';
+    if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+    return (num / 1000).toFixed(0) + 'K';
+  };
+
   const PieChart = ({ allocations, budget }) => {
     const size = 220;
     const cx = 110, cy = 110, r = 80;
@@ -116,59 +123,44 @@ export default function Home() {
 
   const ReachBuildUp = ({ data }) => {
     if (!data || data.length === 0) return null;
-    const validData = data.filter(d => Number(d.ceiling) > 0 && !isNaN(Number(d.ceiling)));
-    if (validData.length === 0) return <div style={{ color: '#999' }}>Reach data unavailable</div>;
-    const w = 600, h = 300, padL = 70, padR = 20, padT = 30, padB = 70;
-    const maxVal = Math.max(...validData.map(d => Number(d.ceiling)));
-    if (!maxVal || maxVal === 0) return <div style={{ color: '#999' }}>Reach data unavailable</div>;
-    const pts = validData.map((d, i) => {
-      const x = padL + (validData.length === 1 ? (w - padL - padR) / 2 : (i / (validData.length - 1)) * (w - padL - padR));
-      const ceiling = Number(d.ceiling);
-      const floor = Number(d.floor);
-      const yC = padT + (1 - ceiling / maxVal) * (h - padT - padB);
-      const yF = padT + (1 - floor / maxVal) * (h - padT - padB);
-      return { x, yC, yF, ceiling, floor, added: d.added };
-    });
-    const fmt = (n) => n >= 1000000 ? (n / 1000000).toFixed(1) + 'M' : (n / 1000).toFixed(0) + 'K';
-    const cPath = pts.map((p, i) => (i === 0 ? 'M' : 'L') + ' ' + p.x.toFixed(1) + ' ' + p.yC.toFixed(1)).join(' ');
-    const fPath = pts.map((p, i) => (i === 0 ? 'M' : 'L') + ' ' + p.x.toFixed(1) + ' ' + p.yF.toFixed(1)).join(' ');
-    const band = cPath + ' ' + [...pts].reverse().map(p => 'L ' + p.x.toFixed(1) + ' ' + p.yF.toFixed(1)).join(' ') + ' Z';
     return (
-      <div style={{ overflowX: 'auto' }}>
-        <svg width="100%" viewBox={'0 0 ' + w + ' ' + h} style={{ overflow: 'visible', minWidth: '400px' }}>
-          <defs>
-            <linearGradient id="bandGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#888" stopOpacity="0.25" />
-              <stop offset="100%" stopColor="#888" stopOpacity="0.05" />
-            </linearGradient>
-          </defs>
-          <line x1={padL} y1={padT} x2={padL} y2={h - padB} stroke="#ddd" strokeWidth="1" />
-          <line x1={padL} y1={h - padB} x2={w - padR} y2={h - padB} stroke="#ddd" strokeWidth="1" />
-          {[0, 0.25, 0.5, 0.75, 1].map((t, i) => {
-            const y = padT + t * (h - padT - padB);
-            return (
-              <g key={i}>
-                <line x1={padL} y1={y} x2={w - padR} y2={y} stroke="#f0f0f0" strokeWidth="1" />
-                <text x={padL - 6} y={y + 4} textAnchor="end" fontSize="10" fill="#999">{fmt(Math.round(maxVal * (1 - t)))}</text>
-              </g>
-            );
-          })}
-          <path d={band} fill="url(#bandGrad)" />
-          <path d={cPath} fill="none" stroke="#6c2bd9" strokeWidth="2.5" strokeDasharray="6,3" />
-          <path d={fPath} fill="none" stroke="#a855f7" strokeWidth="2.5" strokeDasharray="6,3" />
-          {pts.map((p, i) => (
-            <g key={i}>
-              <circle cx={p.x} cy={p.yC} r="5" fill="#6c2bd9" stroke="#fff" strokeWidth="2" />
-              <circle cx={p.x} cy={p.yF} r="5" fill="#a855f7" stroke="#fff" strokeWidth="2" />
-              <text x={p.x} y={p.yC - 12} textAnchor="middle" fontSize="10" fill="#6c2bd9" fontWeight="600">{fmt(p.ceiling)}</text>
-              <text x={p.x} y={h - padB + 16} textAnchor="middle" fontSize="10" fill="#555">{p.added}</text>
-            </g>
-          ))}
-          <rect x={padL + 8} y={padT} width="10" height="3" fill="#6c2bd9" />
-          <text x={padL + 22} y={padT + 4} fontSize="10" fill="#6c2bd9">Ceiling (Independence)</text>
-          <rect x={padL + 8} y={padT + 14} width="10" height="3" fill="#a855f7" />
-          <text x={padL + 22} y={padT + 18} fontSize="10" fill="#a855f7">Floor (Decay)</text>
-        </svg>
+      <div>
+        <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', fontSize: '0.8rem' }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ display: 'inline-block', width: '12px', height: '3px', background: '#6c2bd9' }} />Ceiling (Independence Model)</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ display: 'inline-block', width: '12px', height: '3px', background: '#a855f7' }} />Floor (Exponential Decay)</span>
+        </div>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+          <thead>
+            <tr style={{ borderBottom: '2px solid #eee' }}>
+              <th style={{ padding: '10px 12px', textAlign: 'left', color: '#888', fontWeight: 600, fontSize: '0.8rem' }}>Platform Added</th>
+              <th style={{ padding: '10px 12px', textAlign: 'left', color: '#6c2bd9', fontWeight: 600, fontSize: '0.8rem' }}>Ceiling Reach</th>
+              <th style={{ padding: '10px 12px', textAlign: 'left', color: '#a855f7', fontWeight: 600, fontSize: '0.8rem' }}>Floor Reach</th>
+              <th style={{ padding: '10px 12px', textAlign: 'left', color: '#888', fontWeight: 600, fontSize: '0.8rem' }}>Range</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.map((d, i) => {
+              const ceiling = Number(d.ceiling);
+              const floor = Number(d.floor);
+              const pct = data[data.length - 1] ? Math.round(ceiling / Number(data[data.length - 1].ceiling) * 100) : 0;
+              return (
+                <tr key={i} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                  <td style={{ padding: '12px', fontWeight: 600 }}>
+                    <span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '2px', background: COLORS[i % COLORS.length], marginRight: '8px' }} />
+                    {d.added}
+                  </td>
+                  <td style={{ padding: '12px', color: '#6c2bd9', fontWeight: 700 }}>{fmtReach(ceiling)}</td>
+                  <td style={{ padding: '12px', color: '#a855f7', fontWeight: 700 }}>{fmtReach(floor)}</td>
+                  <td style={{ padding: '12px' }}>
+                    <div style={{ background: '#f0f0f0', borderRadius: '4px', height: '8px', width: '120px' }}>
+                      <div style={{ background: 'linear-gradient(90deg, #6c2bd9, #a855f7)', width: pct + '%', height: '8px', borderRadius: '4px' }} />
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
     );
   };
@@ -288,7 +280,7 @@ export default function Home() {
                       <td style={{ padding: '12px', color: '#6c2bd9', fontWeight: 600 }}>${(a.budget || Math.round(formData.budget * a.percentage / 100)).toLocaleString()}</td>
                       <td style={{ padding: '12px' }}>${a.cpm}</td>
                       <td style={{ padding: '12px' }}>{a.frequency}x</td>
-                      <td style={{ padding: '12px' }}>{a.estimatedReach ? (a.estimatedReach / 1000).toFixed(0) + 'K' : '-'}</td>
+                      <td style={{ padding: '12px' }}>{fmtReach(a.estimatedReach)}</td>
                       <td style={{ padding: '12px' }}>{a.mainKPI || '-'}</td>
                       <td style={{ padding: '12px', color: '#666', fontSize: '0.85rem' }}>{a.rationale}</td>
                     </tr>
@@ -299,7 +291,7 @@ export default function Home() {
             {result.reachCurve && (
               <div style={{ background: '#fff', borderRadius: '12px', padding: '28px', marginBottom: '20px', border: '1px solid #e0e0e0' }}>
                 <div style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.1em', color: '#888', marginBottom: '4px' }}>CUMULATIVE REACH BUILD-UP</div>
-                <p style={{ margin: '0 0 20px', fontSize: '0.8rem', color: '#aaa' }}>Grey band shows range between independence model ceiling and exponential decay floor</p>
+                <p style={{ margin: '0 0 20px', fontSize: '0.8rem', color: '#aaa' }}>Shows range between independence model ceiling and exponential decay floor as each platform is added</p>
                 <ReachBuildUp data={result.reachCurve} />
               </div>
             )}
