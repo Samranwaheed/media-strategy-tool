@@ -116,33 +116,39 @@ export default function Home() {
 
   const ReachBuildUp = ({ data }) => {
     if (!data || data.length === 0) return null;
-    const w = 600, h = 300, padL = 70, padR = 20, padT = 20, padB = 60;
-    const maxVal = Math.max(...data.map(d => d.ceiling));
-    const points = data.map((d, i) => {
-      const x = padL + (i / (data.length - 1)) * (w - padL - padR);
-      const yC = padT + (1 - d.ceiling / maxVal) * (h - padT - padB);
-      const yF = padT + (1 - d.floor / maxVal) * (h - padT - padB);
-      return { x, yC, yF, ...d };
-    });
+    const validData = data.filter(d => d.ceiling > 0 && d.floor >= 0 && !isNaN(d.ceiling) && !isNaN(d.floor));
+    if (validData.length === 0) return <div style={{ color: '#999', fontSize: '0.9rem' }}>Reach data unavailable</div>;
 
-    const ceilingPath = points.map((p, i) => (i === 0 ? 'M' : 'L') + ' ' + p.x + ' ' + p.yC).join(' ');
-    const floorPath = points.map((p, i) => (i === 0 ? 'M' : 'L') + ' ' + p.x + ' ' + p.yF).join(' ');
-    const bandPath = ceilingPath + ' ' + points.slice().reverse().map((p, i) => (i === 0 ? 'L' : 'L') + ' ' + p.x + ' ' + p.yF).join(' ') + ' Z';
+    const w = 600, h = 300, padL = 70, padR = 20, padT = 30, padB = 70;
+    const maxVal = Math.max(...validData.map(d => d.ceiling), 1);
 
-    const fmt = (n) => n >= 1000000 ? (n / 1000000).toFixed(1) + 'M' : (n / 1000).toFixed(0) + 'K';
+    const getX = (i) => padL + (i / Math.max(validData.length - 1, 1)) * (w - padL - padR);
+    const getYC = (d) => padT + (1 - d.ceiling / maxVal) * (h - padT - padB);
+    const getYF = (d) => padT + (1 - d.floor / maxVal) * (h - padT - padB);
+
+    const points = validData.map((d, i) => ({ x: getX(i), yC: getYC(d), yF: getYF(d), ...d }));
+
+    const ceilingPath = points.map((p, i) => (i === 0 ? 'M' : 'L') + ' ' + p.x.toFixed(1) + ' ' + p.yC.toFixed(1)).join(' ');
+    const floorPath = points.map((p, i) => (i === 0 ? 'M' : 'L') + ' ' + p.x.toFixed(1) + ' ' + p.yF.toFixed(1)).join(' ');
+    const bandPath = ceilingPath + ' ' + [...points].reverse().map(p => 'L ' + p.x.toFixed(1) + ' ' + p.yF.toFixed(1)).join(' ') + ' Z';
+
+    const fmt = (n) => {
+      if (!n || isNaN(n)) return '0';
+      return n >= 1000000 ? (n / 1000000).toFixed(1) + 'M' : (n / 1000).toFixed(0) + 'K';
+    };
 
     return (
       <div style={{ overflowX: 'auto' }}>
         <svg width="100%" viewBox={'0 0 ' + w + ' ' + h} style={{ overflow: 'visible', minWidth: '400px' }}>
           <defs>
             <linearGradient id="bandGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#aaaaaa" stopOpacity="0.3" />
-              <stop offset="100%" stopColor="#aaaaaa" stopOpacity="0.1" />
+              <stop offset="0%" stopColor="#888888" stopOpacity="0.25" />
+              <stop offset="100%" stopColor="#888888" stopOpacity="0.05" />
             </linearGradient>
           </defs>
 
-          <line x1={padL} y1={padT} x2={padL} y2={h - padB} stroke="#eee" strokeWidth="1" />
-          <line x1={padL} y1={h - padB} x2={w - padR} y2={h - padB} stroke="#eee" strokeWidth="1" />
+          <line x1={padL} y1={padT} x2={padL} y2={h - padB} stroke="#ddd" strokeWidth="1" />
+          <line x1={padL} y1={h - padB} x2={w - padR} y2={h - padB} stroke="#ddd" strokeWidth="1" />
 
           {[0, 0.25, 0.5, 0.75, 1].map((t, i) => {
             const y = padT + t * (h - padT - padB);
@@ -150,26 +156,28 @@ export default function Home() {
             return (
               <g key={i}>
                 <line x1={padL} y1={y} x2={w - padR} y2={y} stroke="#f0f0f0" strokeWidth="1" />
-                <text x={padL - 8} y={y + 4} textAnchor="end" fontSize="10" fill="#999">{fmt(val)}</text>
+                <text x={padL - 6} y={y + 4} textAnchor="end" fontSize="10" fill="#999">{fmt(val)}</text>
               </g>
             );
           })}
 
-          <path d={bandPath} fill="url(#bandGrad)" stroke="none" />
-          <path d={ceilingPath} fill="none" stroke="#6c2bd9" strokeWidth="2" strokeDasharray="5,3" />
-          <path d={floorPath} fill="none" stroke="#a855f7" strokeWidth="2" strokeDasharray="5,3" />
+          <path d={bandPath} fill="url(#bandGrad)" />
+          <path d={ceilingPath} fill="none" stroke="#6c2bd9" strokeWidth="2.5" strokeDasharray="6,3" />
+          <path d={floorPath} fill="none" stroke="#a855f7" strokeWidth="2.5" strokeDasharray="6,3" />
 
           {points.map((p, i) => (
             <g key={i}>
-              <circle cx={p.x} cy={p.yC} r="4" fill="#6c2bd9" stroke="#fff" strokeWidth="2" />
-              <circle cx={p.x} cy={p.yF} r="4" fill="#a855f7" stroke="#fff" strokeWidth="2" />
-              <text x={p.x} y={h - padB + 16} textAnchor="middle" fontSize="10" fill="#666">{p.added}</text>
-              <text x={p.x} y={p.yC - 10} textAnchor="middle" fontSize="10" fill="#6c2bd9" fontWeight="600">{fmt(p.ceiling)}</text>
+              <circle cx={p.x} cy={p.yC} r="5" fill="#6c2bd9" stroke="#fff" strokeWidth="2" />
+              <circle cx={p.x} cy={p.yF} r="5" fill="#a855f7" stroke="#fff" strokeWidth="2" />
+              <text x={p.x} y={p.yC - 12} textAnchor="middle" fontSize="10" fill="#6c2bd9" fontWeight="600">{fmt(p.ceiling)}</text>
+              <text x={p.x} y={h - padB + 16} textAnchor="middle" fontSize="10" fill="#555" fontWeight="600">{p.added}</text>
             </g>
           ))}
 
-          <text x={padL + 8} y={padT + 14} fontSize="10" fill="#6c2bd9">--- Ceiling (Independence)</text>
-          <text x={padL + 8} y={padT + 28} fontSize="10" fill="#a855f7">--- Floor (Decay)</text>
+          <rect x={padL + 8} y={padT} width="10" height="3" fill="#6c2bd9" />
+          <text x={padL + 22} y={padT + 4} fontSize="10" fill="#6c2bd9">Ceiling (Independence Model)</text>
+          <rect x={padL + 8} y={padT + 14} width="10" height="3" fill="#a855f7" />
+          <text x={padL + 22} y={padT + 18} fontSize="10" fill="#a855f7">Floor (Exponential Decay)</text>
         </svg>
       </div>
     );
@@ -315,7 +323,7 @@ export default function Home() {
             {result.reachCurve && (
               <div style={{ background: '#fff', borderRadius: '12px', padding: '28px', marginBottom: '20px', border: '1px solid #e0e0e0' }}>
                 <div style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.1em', color: '#888', marginBottom: '4px' }}>CUMULATIVE REACH BUILD-UP</div>
-                <p style={{ margin: '0 0 20px', fontSize: '0.8rem', color: '#aaa' }}>Shaded band shows range between independence model (ceiling) and exponential decay (floor)</p>
+                <p style={{ margin: '0 0 20px', fontSize: '0.8rem', color: '#aaa' }}>Grey band shows range between independence model ceiling and exponential decay floor</p>
                 <ReachBuildUp data={result.reachCurve} />
               </div>
             )}
